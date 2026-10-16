@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Suivi des percepteurs</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#f6f4ef;--card:#fff;--tx:#1d1b16;--mut:#6b675d;--ln:#e3dfd3;--ac:#b4571e;--acbg:#fbeadd;--ok:#2f7d4f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#17150f;--card:#221f17;--tx:#f1ede2;--mut:#a39e8f;--ln:#383426;--ac:#e8895a;--acbg:#3a2a1d;--ok:#6cc08c}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#17150f;--card:#221f17;--tx:#f1ede2;--mut:#a39e8f;--ln:#383426;--ac:#e8895a;--acbg:#3a2a1d;--ok:#6cc08c}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{padding:20px 16px 8px;max-width:1000px;margin:0 auto}
+h1{margin:0;font-size:22px}
+.sub{color:var(--mut);font-size:13px;margin-top:4px}
+.bar{max-width:1000px;margin:0 auto;padding:8px 16px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.tab{border:1px solid var(--ln);background:var(--card);color:var(--tx);padding:8px 14px;border-radius:999px;cursor:pointer;font:inherit}
+.tab.on{background:var(--ac);border-color:var(--ac);color:#fff}
+#q,.in{flex:1;min-width:140px;border:1px solid var(--ln);background:var(--card);color:var(--tx);padding:8px 12px;border-radius:8px;font:inherit}
+.btn{border:0;background:var(--ac);color:#fff;padding:8px 14px;border-radius:8px;font:inherit;cursor:pointer}
+.add{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}
+main{max-width:1000px;margin:0 auto;padding:0 16px 40px}
+.wrap{overflow-x:auto;background:var(--card);border:1px solid var(--ln);border-radius:12px}
+table{border-collapse:collapse;width:100%;min-width:640px}
+th{text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut);padding:10px;border-bottom:1px solid var(--ln)}
+td{padding:6px 10px;border-bottom:1px solid var(--ln);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+td.z{font-weight:600}
+td.c{color:var(--mut);white-space:nowrap}
+td.d{white-space:nowrap;font-size:13px;color:var(--ok)}
+input.f{width:100%;border:1px solid transparent;background:transparent;color:var(--tx);padding:6px 8px;border-radius:6px;font:inherit}
+input.f:hover{border-color:var(--ln)}
+input.f:focus{outline:2px solid var(--ac);background:var(--bg)}
+tr.has td.z{color:var(--ac)}
+.note{margin:10px 0;color:var(--mut);font-size:13px}
+.g{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--ln)}
+.g:last-child{border-bottom:0}
+.g .r{display:flex;align-items:center;gap:10px}
+.n{background:var(--acbg);color:var(--ac);border-radius:999px;padding:0 10px;font-weight:700}
+.del,.x{border:1px solid var(--ln);background:transparent;color:var(--mut);border-radius:6px;padding:2px 10px;cursor:pointer;font:inherit}
+.x{padding:0 7px;margin-left:8px;font-size:12px}
+.empty{padding:16px;color:var(--mut)}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<header>
+<h1>🛡️ Suivi des percepteurs</h1>
+<div class="sub">Tape le nom de la guilde : la date s'enregistre automatiquement. <span id="sync"></span> <a href="#" id="logout" style="color:var(--mut)">changer de code</a></div>
+</header>
+<div class="bar" id="lock" hidden><input id="lockin" class="in" type="password" placeholder="Code d'accès de la guilde"><button id="lockbtn" class="btn">Entrer</button><button id="lockcreate" class="btn" hidden style="background:var(--mut)">Créer l'espace</button><div id="lockmsg" class="note" style="width:100%"></div></div>
+<div class="bar" id="tabs"></div>
+<div class="bar"><input id="q" type="search" placeholder="Rechercher une zone, un donjon, une guilde…"></div>
+<main><div id="note" class="note"></div><div id="form"></div><div class="wrap" id="out"></div></main>
+<datalist id="gl"></datalist>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {getFirestore,doc,getDoc,setDoc,deleteDoc,collection,onSnapshot} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+/* ====== À REMPLIR : colle ici la configuration de ton projet Firebase ====== */
+const firebaseConfig={
+  apiKey:"AIzaSyA5FvnJQfwH-aLWGpJNG2j8E_GQ-v7_n_w",
+  authDomain:"pos-perco.firebaseapp.com",
+  projectId:"pos-perco",
+  appId:"1:10701638885:web:6b15c74739466c0444180c"
+};
+/* ========================================================================== */
+
+const D={"zones": [["Plaines herbeuses", "-50.13"], ["Jungle obscure", "-52.1"], ["Péninsule des gelées", "10.28"], ["L'île de Grobe", "33,-53"], ["Village des Zoths", "-54.16"], ["Feuillage de L'arbre Hakam", "-54.15"], ["Bordure d'Aerdala", "17,-37"], ["La plage de Moon", "33.1"], ["Caverne des Fungus", "-18.33"], ["Vallée de la Morh'Kitu", "-16.13"], ["Territoire des Bandits", "12.18"], ["La foret d'amakma", "8.14"], ["Foret des Abraknydes", "-11,-16"], ["L'île du Minotoror", "-43,-19"], ["Plaine des Porkass", "-3,-29"], ["La montagne des Craqueleurs", "-4,-6"], ["Campement des bworks", "-1.8"], ["Sous terrain des Dragoeufs", "-3.25"], ["Sanctuaire des Dragoeufs", "-6.27"], ["Plaine des Scarafeuilles", "1.28"], ["Lande de sidimote", "-25.1"], ["Cimetière des torturés", "-11.38"], ["Plage de Corail", "-53.0"], ["Tourbière nauséabonde", "-59,-8"], ["Plaine de Cania", "-6,-53"], ["Foret de Cania", "-6,-46"], ["Sufokia", "12.23"], ["Foret abraknyde sombre", "-14,-13"], ["Lande de sidimote", "-10, -23"], ["Champs du repos", "1,-12"], ["Champs de Cania", "-20,-41"]], "donjons": [["Abraknydes Ancestral", ""], ["Batofu", ""], ["Blop Multicolore", ""], ["Bouftou Royal", ""], ["Bulbig", ""], ["Bworker", ""], ["Bworkette", ""], ["Chêne Mou", ""], ["Corailleur Magistral", ""], ["Craqueleurs Légendaire", ""], ["Crocabulia", ""], ["Dark Vlad", ""], ["Blop", "Indigo"], ["Blop", "Reinette"], ["Blop", "Griotte"], ["Blop", "Coco"], ["Donjon des Champs", ""], ["Donjon des Larves", ""], ["Donjon ensablé", ""], ["Dragon Cochon", ""], ["Forgeron", ""], ["Gourlo le Terrible", ""], ["Grollum", ""], ["Ilyzaelle", ""], ["Incarnam", ""], ["Kimbo", ""], ["Koulosse", ""], ["Maitre Corbac", ""], ["Maître Pandore", ""], ["Meulou", ""], ["Minotoror", ""], ["Minotot", ""], ["Moon", ""], ["Nowel", ""], ["Ougah", ""], ["Péki Péki", ""], ["Qu'tan", ""], ["Rasboul", ""], ["Rat Blanc", ""], ["Rat Noir", ""], ["Scarabosse Doré", ""], ["Skeunk", ""], ["Sphincter Cell", ""], ["Squelettes", ""], ["Tanukouï San", ""], ["Tofu Royal", ""], ["Tynril", ""], ["Wa Wabbit", ""]], "autres": [["Palidane", ""], ["Craque Celeste Ily", "-32,-12"], ["DarkVlad", "-7.16"], ["Salle chefs de guerre bouftou", ""], ["s2 dj torror", ""], ["dragoeufs top", "-7.28"]], "guildes": ["Etoile Polaire", "La Garde du Jour", "Eternelle Moisson", "Limitless", "La Garde de Nuit", "Solaire", "Andalucia", "Nyx", "Fear", "Liberty", "Omniscient", "Switzerland", "Mirage", "Uninstall Pvp", "Renaissance", "Illusion", "Ciel", "Dracarys", "La Legion", "Hispania", "Phantom", "Wano Kuni", "La brigade fantome", "Legion", "Instinct", "Cipher pol", "Blitzkrieg", "No Mercy", "Perkisition", "Extinction", "Confrerie du Tofu", "Mysterium"]};
+const TABS={
+ zones:{label:'Zones',head:['Zone','Coord.'],rows:D.zones},
+ donjons:{label:'Donjons / Boss',head:['Donjon','Salle boss'],rows:D.donjons},
+ autres:{label:'Autres',head:['Lieu','Coord.']},
+ guildes:{label:'Guildes'}
+};
+let tab='zones',st={},cu={},gd={},coll=null,cuColl=null,gColl=null,pend=null;
+const $=s=>document.querySelector(s);
+const id=(t,i)=>t+'_'+i;
+const fmt=iso=>{if(!iso)return'';const d=new Date(iso);return d.toLocaleDateString('fr-FR')+' '+d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const hex=s=>Array.from(new TextEncoder().encode(s.toLowerCase())).map(b=>b.toString(16).padStart(2,'0')).join('');
+const warn=e=>{$('#sync').textContent='⚠️ Enregistrement refusé ('+(e&&e.code||'erreur')+')'};
+
+function guildNames(){
+ const m=new Map();D.guildes.forEach(g=>m.set(hex(g),g));
+ Object.entries(gd).forEach(([k,v])=>{if(v.removed)m.delete(k);else if(v.name)m.set(k,v.name)});
+ return [...m.values()].sort((a,b)=>a.localeCompare(b));
+}
+const canon=n=>guildNames().find(g=>g.toLowerCase()===n.toLowerCase())||n;
+function addGuild(name){
+ name=name.trim();if(!name)return;
+ const k=hex(name);gd[k]={name:canon(name),removed:false};
+ if(gColl)gColl.doc(k).set(gd[k]).catch(warn);
+ paint();
+}
+function removeGuild(name){
+ const k=hex(name);gd[k]={name,removed:true};
+ if(gColl)gColl.doc(k).set(gd[k]).catch(warn);
+ Object.keys(st).forEach(key=>{if(st[key].guilde===name)save(key,{guilde:'',date:''})});
+ paint();
+}
+function addLieu(){
+ const nom=$('#nn').value.trim();if(!nom)return;
+ const d=Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+ const v={nom,coords:$('#nc').value.trim(),at:new Date().toISOString(),t:tab};
+ cu[d]=v;if(cuColl)cuColl.doc(d).set(v).catch(warn);
+ $('#nn').value='';$('#nc').value='';buildRows();$('#nn').focus();
+}
+function removeLieu(d){
+ const key='lieu_'+d;delete cu[d];delete st[key];
+ if(cuColl)cuColl.doc(d).delete().catch(warn);
+ if(coll)coll.doc(key).delete().catch(()=>{});
+ buildRows();
+}
+function save(key,patch){
+ if(patch.guilde){patch.guilde=canon(patch.guilde);if(!guildNames().includes(patch.guilde))addGuild(patch.guilde)}
+ const cur=st[key]||{guilde:'',date:'',commentaire:''};
+ const nv=Object.assign({},cur,patch);st[key]=nv;paint();
+ if(coll)coll.doc(key).set(nv).catch(warn);
+}
+function rowsOf(t){
+ const src=t==='autres'?D.autres:TABS[t].rows;
+ const base=src.map((r,i)=>({k:id(t,i),a:r[0],b:r[1]}));
+ if(t!=='autres'&&t!=='zones')return base;
+ const ex=Object.entries(cu).filter(([d,v])=>(v.t||'autres')===t).sort((x,y)=>(x[1].at||'').localeCompare(y[1].at||'')).map(([d,v])=>({k:'lieu_'+d,a:v.nom||'',b:v.coords||'',d}));
+ return base.concat(ex);
+}
+function drawTabs(){
+ $('#tabs').innerHTML=Object.keys(TABS).map(k=>'<button class="tab'+(k===tab?' on':'')+'" data-k="'+k+'">'+TABS[k].label+'</button>').join('');
+ $('#tabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{tab=b.dataset.k;pend=null;drawTabs();build()});
+}
+function build(){
+ const f=$('#form');
+ if(tab==='guildes'){
+  $('#note').textContent='Nombre de percepteurs par guilde (calculé automatiquement). Supprimer une guilde libère ses percepteurs.';
+  f.innerHTML='<div class="add"><input id="ng" class="in" placeholder="Nouvelle guilde…"><button id="nb" class="btn">Ajouter la guilde</button></div>';
+  const go=()=>{addGuild($('#ng').value);$('#ng').value='';$('#ng').focus()};
+  $('#nb').onclick=go;$('#ng').onkeydown=e=>{if(e.key==='Enter')go()};
+  paint();return;
+ }
+ $('#note').textContent="Choisis ou tape une guilde ; en l'effaçant, la date est supprimée.";
+ if(tab==='autres'||tab==='zones'){
+  f.innerHTML='<div class="add"><input id="nn" class="in" placeholder="'+(tab==='zones'?'Nouvelle zone…':'Nouveau lieu…')+'"><input id="nc" class="in" placeholder="Coord. (ex : -5,12)"><button id="nb" class="btn">'+(tab==='zones'?'Ajouter la zone':'Ajouter le lieu')+'</button></div>';
+  $('#nb').onclick=addLieu;
+  $('#nn').onkeydown=$('#nc').onkeydown=e=>{if(e.key==='Enter')addLieu()};
+ }else f.innerHTML='';
+ buildRows();
+}
+function buildRows(){
+ if(tab==='guildes')return;
+ const T=TABS[tab],out=$('#out');
+ out.innerHTML='<table><thead><tr><th>'+T.head[0]+'</th><th>'+T.head[1]+'</th><th>Guilde perco</th><th>Date</th><th>Commentaire</th></tr></thead><tbody>'+
+ rowsOf(tab).map(r=>'<tr data-k="'+esc(r.k)+'" data-b="'+esc((r.a+' '+r.b).toLowerCase())+'"><td class="z">'+esc(r.a)+(r.d?'<button class="x" data-act="l" data-key="'+esc(r.d)+'" title="Supprimer ce lieu">✕</button>':'')+'</td><td class="c">'+esc(r.b)+'</td><td><input class="f g1" list="gl" placeholder="Guilde…"></td><td class="d"></td><td><input class="f c1" placeholder="Commentaire…"></td></tr>').join('')+'</tbody></table>';
+ out.querySelectorAll('tr[data-k]').forEach(tr=>{
+  const k=tr.dataset.k;
+  tr.querySelector('.g1').onchange=e=>{const g=e.target.value.trim();save(k,{guilde:g,date:g?new Date().toISOString():''})};
+  tr.querySelector('.c1').onchange=e=>save(k,{commentaire:e.target.value.trim()});
+ });
+ paint();
+}
+function paint(){
+ const names=guildNames();
+ $('#gl').innerHTML=names.map(g=>'<option value="'+esc(g)+'">').join('');
+ if(tab==='guildes'){
+  const cnt={};names.forEach(g=>cnt[g]=0);
+  Object.values(st).forEach(v=>{if(v.guilde&&v.guilde in cnt)cnt[v.guilde]++});
+  const l=Object.entries(cnt).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]));
+  $('#out').innerHTML=l.length?l.map(([g,n])=>'<div class="g"><span>'+esc(g)+'</span><span class="r"><span class="n">'+n+'</span><button class="del" data-act="g" data-key="'+esc(g)+'">'+(pend==='g'+g?'Sûr ?':'Supprimer')+'</button></span></div>').join(''):'<div class="empty">Aucune guilde. Ajoute-en une ci-dessus.</div>';
+  return;
+ }
+ document.querySelectorAll('#out tr[data-k]').forEach(tr=>{
+  const v=st[tr.dataset.k]||{guilde:'',date:'',commentaire:''};
+  const g=tr.querySelector('.g1'),c=tr.querySelector('.c1');
+  if(document.activeElement!==g)g.value=v.guilde||'';
+  if(document.activeElement!==c)c.value=v.commentaire||'';
+  tr.querySelector('.d').textContent=fmt(v.date);
+  tr.classList.toggle('has',!!v.guilde);
+  tr.dataset.s=tr.dataset.b+'|'+(v.guilde||'').toLowerCase();
+ });
+ filter();
+}
+function filter(){
+ const q=$('#q').value.trim().toLowerCase();
+ document.querySelectorAll('#out tr[data-k]').forEach(tr=>{tr.style.display=!q||(tr.dataset.s||'').includes(q)?'':'none'});
+}
+$('#q').oninput=filter;
+$('#out').onclick=e=>{
+ const b=e.target.closest('button[data-act]');if(!b)return;
+ const act=b.dataset.act,key=b.dataset.key,tag=act+key;
+ if(pend!==tag){
+  pend=tag;b.textContent='Sûr ?';
+  setTimeout(()=>{if(pend===tag){pend=null;if(b.isConnected)b.textContent=act==='g'?'Supprimer':'✕'}},3500);
+  return;
+ }
+ pend=null;
+ if(act==='g')removeGuild(key);else removeLieu(key);
+};
+drawTabs();build();
+let db=null,code='';
+try{code=localStorage.getItem('pc')||''}catch(e){}
+const msg=m=>{$('#lockmsg').textContent=m};
+const mk=(c,name)=>({
+ doc:k=>({set:v=>setDoc(doc(db,'g',c,name,k),v),delete:()=>deleteDoc(doc(db,'g',c,name,k))}),
+ onSnapshot:(n,e)=>onSnapshot(collection(db,'g',c,name),n,e)
+});
+async function connect(create){
+ const c=$('#lockin').value.trim()||code;
+ if(firebaseConfig.apiKey.includes('COLLE')){$('#lock').hidden=false;msg("Configuration Firebase manquante : remplis firebaseConfig dans index.html.");return}
+ if(!c){$('#lock').hidden=false;return}
+ if(!/^[A-Za-z0-9_-]{4,}$/.test(c)){$('#lock').hidden=false;msg('Code : 4 caractères minimum (lettres, chiffres, - et _ uniquement).');return}
+ try{
+  if(!db)db=getFirestore(initializeApp(firebaseConfig));
+  const ok=doc(db,'g',c,'meta','ok');
+  const s=await getDoc(ok);
+  if(!s.exists()){
+   if(!create){$('#lock').hidden=false;$('#lockcreate').hidden=false;msg("Code inconnu. Si c'est le tout premier lancement, clique sur « Créer l'espace ».");return}
+   await setDoc(ok,{at:new Date().toISOString()});
+  }
+ }catch(e){$('#lock').hidden=false;msg('Connexion impossible : '+(e.code||e.message));return}
+ code=c;try{localStorage.setItem('pc',c)}catch(e){}
+ $('#lock').hidden=true;msg('');
+ coll=mk(c,'entries');cuColl=mk(c,'lieux');gColl=mk(c,'guilds');
+ const err=e=>{$('#sync').textContent='⚠️ '+(e.code||'erreur')};
+ coll.onSnapshot(s=>{const n={};s.docs.forEach(d=>{n[d.id]=d.data()});st=n;paint();$('#sync').textContent='🟢 Synchronisé en direct'},err);
+ cuColl.onSnapshot(s=>{const n={};s.docs.forEach(d=>{n[d.id]=d.data()});cu=n;if(tab==='autres'||tab==='zones')buildRows()},err);
+ gColl.onSnapshot(s=>{const n={};s.docs.forEach(d=>{n[d.id]=d.data()});gd=n;paint()},err);
+}
+$('#lockbtn').onclick=()=>connect(false);
+$('#lockcreate').onclick=()=>connect(true);
+$('#lockin').onkeydown=e=>{if(e.key==='Enter')connect(false)};
+$('#logout').onclick=e=>{e.preventDefault();try{localStorage.removeItem('pc')}catch(x){}location.reload()};
+connect(false);
+</script>
+</body>
+</html>
