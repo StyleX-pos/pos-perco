@@ -29,7 +29,9 @@ td{padding:6px 10px;border-bottom:1px solid var(--ln);vertical-align:middle}
 tr:last-child td{border-bottom:0}
 td.z{font-weight:600}
 td.c{color:var(--mut);white-space:nowrap}
-td.d{white-space:nowrap;font-size:13px;color:var(--ok)}
+td.d{white-space:nowrap;font-size:13px}
+.rel.ok{color:var(--ok)}.rel.mid{color:#c98a00}.rel.old{color:#c0392b}
+.seen{border:0;background:transparent;cursor:pointer;margin-left:6px;font-size:14px}
 input.f{width:100%;border:1px solid transparent;background:transparent;color:var(--tx);padding:6px 8px;border-radius:6px;font:inherit}
 input.f:hover{border-color:var(--ln)}
 input.f:focus{outline:2px solid var(--ac);background:var(--bg)}
@@ -42,18 +44,25 @@ tr.has td.z{color:var(--ac)}
 .del,.x{border:1px solid var(--ln);background:transparent;color:var(--mut);border-radius:6px;padding:2px 10px;cursor:pointer;font:inherit}
 .x{padding:0 7px;margin-left:8px;font-size:12px}
 .empty{padding:16px;color:var(--mut)}
+.tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 12px}
+.chip{border:1px solid var(--ln);background:var(--card);color:var(--tx);padding:5px 12px;border-radius:999px;cursor:pointer;font:inherit;font-size:13px}
+.chip.on{background:var(--acbg);border-color:var(--ac);color:var(--ac)}
+.tools select{border:1px solid var(--ln);background:var(--card);color:var(--tx);padding:6px 10px;border-radius:8px;font:inherit;font-size:13px}
+td.cp{cursor:pointer}td.cp:hover{color:var(--ac);text-decoration:underline}
+#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:8px 14px;border-radius:999px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s}
+#toast.on{opacity:1}
 [hidden]{display:none!important}
 </style>
 </head>
 <body>
 <header>
 <h1>🛡️ Suivi des percepteurs</h1>
-<div class="sub">Tape le nom de la guilde : la date s'enregistre automatiquement. <span id="sync"></span> <a href="#" id="logout" style="color:var(--mut)">changer de code</a></div>
+<div class="sub">Tape le nom de la guilde : la date s'enregistre automatiquement. <span id="sync"></span></div>
 </header>
-<div class="bar" id="lock" hidden><input id="lockin" class="in" type="password" placeholder="Code d'accès de la guilde"><button id="lockbtn" class="btn">Entrer</button><button id="lockcreate" class="btn" hidden style="background:var(--mut)">Créer l'espace</button><div id="lockmsg" class="note" style="width:100%"></div></div>
 <div class="bar" id="tabs"></div>
-<div class="bar"><input id="q" type="search" placeholder="Rechercher une zone, un donjon, une guilde…"></div>
-<main><div id="note" class="note"></div><div id="form"></div><div class="wrap" id="out"></div></main>
+<div class="bar"><input id="q" type="search" placeholder="Rechercher une zone, un donjon, une guilde…"><input id="me" class="in" maxlength="24" placeholder="Ton pseudo (pour « vu par »)"></div>
+<main><div id="note" class="note"></div><div id="tools" class="tools"></div><div id="form"></div><div class="wrap" id="out"></div></main>
+<div id="toast"></div>
 <datalist id="gl"></datalist>
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
@@ -68,6 +77,8 @@ const firebaseConfig={
 };
 /* ========================================================================== */
 
+const SPACE='guilde';
+
 const D={"zones": [["Plaines herbeuses", "-50.13"], ["Jungle obscure", "-52.1"], ["Péninsule des gelées", "10.28"], ["L'île de Grobe", "33,-53"], ["Village des Zoths", "-54.16"], ["Feuillage de L'arbre Hakam", "-54.15"], ["Bordure d'Aerdala", "17,-37"], ["La plage de Moon", "33.1"], ["Caverne des Fungus", "-18.33"], ["Vallée de la Morh'Kitu", "-16.13"], ["Territoire des Bandits", "12.18"], ["La foret d'amakma", "8.14"], ["Foret des Abraknydes", "-11,-16"], ["L'île du Minotoror", "-43,-19"], ["Plaine des Porkass", "-3,-29"], ["La montagne des Craqueleurs", "-4,-6"], ["Campement des bworks", "-1.8"], ["Sous terrain des Dragoeufs", "-3.25"], ["Sanctuaire des Dragoeufs", "-6.27"], ["Plaine des Scarafeuilles", "1.28"], ["Lande de sidimote", "-25.1"], ["Cimetière des torturés", "-11.38"], ["Plage de Corail", "-53.0"], ["Tourbière nauséabonde", "-59,-8"], ["Plaine de Cania", "-6,-53"], ["Foret de Cania", "-6,-46"], ["Sufokia", "12.23"], ["Foret abraknyde sombre", "-14,-13"], ["Lande de sidimote", "-10, -23"], ["Champs du repos", "1,-12"], ["Champs de Cania", "-20,-41"]], "donjons": [["Abraknydes Ancestral", ""], ["Batofu", ""], ["Blop Multicolore", ""], ["Bouftou Royal", ""], ["Bulbig", ""], ["Bworker", ""], ["Bworkette", ""], ["Chêne Mou", ""], ["Corailleur Magistral", ""], ["Craqueleurs Légendaire", ""], ["Crocabulia", ""], ["Dark Vlad", ""], ["Blop", "Indigo"], ["Blop", "Reinette"], ["Blop", "Griotte"], ["Blop", "Coco"], ["Donjon des Champs", ""], ["Donjon des Larves", ""], ["Donjon ensablé", ""], ["Dragon Cochon", ""], ["Forgeron", ""], ["Gourlo le Terrible", ""], ["Grollum", ""], ["Ilyzaelle", ""], ["Incarnam", ""], ["Kimbo", ""], ["Koulosse", ""], ["Maitre Corbac", ""], ["Maître Pandore", ""], ["Meulou", ""], ["Minotoror", ""], ["Minotot", ""], ["Moon", ""], ["Nowel", ""], ["Ougah", ""], ["Péki Péki", ""], ["Qu'tan", ""], ["Rasboul", ""], ["Rat Blanc", ""], ["Rat Noir", ""], ["Scarabosse Doré", ""], ["Skeunk", ""], ["Sphincter Cell", ""], ["Squelettes", ""], ["Tanukouï San", ""], ["Tofu Royal", ""], ["Tynril", ""], ["Wa Wabbit", ""]], "autres": [["Palidane", ""], ["Craque Celeste Ily", "-32,-12"], ["DarkVlad", "-7.16"], ["Salle chefs de guerre bouftou", ""], ["s2 dj torror", ""], ["dragoeufs top", "-7.28"]], "guildes": ["Etoile Polaire", "La Garde du Jour", "Eternelle Moisson", "Limitless", "La Garde de Nuit", "Solaire", "Andalucia", "Nyx", "Fear", "Liberty", "Omniscient", "Switzerland", "Mirage", "Uninstall Pvp", "Renaissance", "Illusion", "Ciel", "Dracarys", "La Legion", "Hispania", "Phantom", "Wano Kuni", "La brigade fantome", "Legion", "Instinct", "Cipher pol", "Blitzkrieg", "No Mercy", "Perkisition", "Extinction", "Confrerie du Tofu", "Mysterium"]};
 const TABS={
  zones:{label:'Zones',head:['Zone','Coord.'],rows:D.zones},
@@ -76,9 +87,23 @@ const TABS={
  guildes:{label:'Guildes'}
 };
 let tab='zones',st={},cu={},gd={},coll=null,cuColl=null,gColl=null,pend=null;
+let flt='all',srt='orig',pseudo='',wasSorted=false;
+try{pseudo=localStorage.getItem('pseudo')||''}catch(e){}
 const $=s=>document.querySelector(s);
 const id=(t,i)=>t+'_'+i;
 const fmt=iso=>{if(!iso)return'';const d=new Date(iso);return d.toLocaleDateString('fr-FR')+' '+d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})};
+const ago=iso=>{if(!iso)return'';const s=(Date.now()-new Date(iso))/1000;
+ if(s<60)return"vu à l'instant";
+ if(s<3600)return'vu il y a '+Math.floor(s/60)+' min';
+ if(s<86400)return'vu il y a '+Math.floor(s/3600)+' h';
+ return'vu il y a '+Math.floor(s/86400)+' j'};
+const fresh=iso=>{if(!iso)return'';const s=(Date.now()-new Date(iso))/1000;return s<86400?'ok':s<259200?'mid':'old'};
+const coord=s=>/^-?\d+\.\d+$/.test(s)?s.replace('.',','):s;
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove('on'),1400)}
+async function copyTxt(s){
+ try{await navigator.clipboard.writeText(s)}catch(e){const a=document.createElement('textarea');a.value=s;document.body.appendChild(a);a.select();try{document.execCommand('copy')}catch(x){}a.remove()}
+ toast('Copié : '+s);
+}
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const hex=s=>Array.from(new TextEncoder().encode(s.toLowerCase())).map(b=>b.toString(16).padStart(2,'0')).join('');
 const warn=e=>{$('#sync').textContent='⚠️ Enregistrement refusé ('+(e&&e.code||'erreur')+')'};
@@ -117,6 +142,7 @@ function removeLieu(d){
 function save(key,patch){
  if(patch.guilde){patch.guilde=canon(patch.guilde);if(!guildNames().includes(patch.guilde))addGuild(patch.guilde)}
  const cur=st[key]||{guilde:'',date:'',commentaire:''};
+ if(patch.date!==undefined)patch.par=patch.date?pseudo:'';
  const nv=Object.assign({},cur,patch);st[key]=nv;paint();
  if(coll)coll.doc(key).set(nv).catch(warn);
 }
@@ -131,8 +157,35 @@ function drawTabs(){
  $('#tabs').innerHTML=Object.keys(TABS).map(k=>'<button class="tab'+(k===tab?' on':'')+'" data-k="'+k+'">'+TABS[k].label+'</button>').join('');
  $('#tabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{tab=b.dataset.k;pend=null;drawTabs();build()});
 }
+function drawTools(){
+ const t=$('#tools');
+ if(tab==='guildes'){t.innerHTML='';return}
+ const F=[['all','Tous'],['free','Libres'],['stale','À revérifier (+3 j)']];
+ t.innerHTML=F.map(([k,l])=>'<button class="chip'+(flt===k?' on':'')+'" data-f="'+k+'">'+l+'</button>').join('')+
+ '<select id="srt"><option value="orig">Ordre d’origine</option><option value="old">Les plus anciens d’abord</option><option value="new">Les plus récents d’abord</option></select>';
+ t.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{flt=b.dataset.f;drawTools();filter()});
+ const s=$('#srt');s.value=srt;s.onchange=()=>{srt=s.value;paint()};
+}
+function sortRows(){
+ const tb=document.querySelector('#out tbody');if(!tb)return;
+ if(srt==='orig'&&!wasSorted)return;
+ const act=document.activeElement;
+ if(act&&tb.contains(act)&&act.tagName==='INPUT')return;
+ wasSorted=srt!=='orig';
+ const ts=tr=>{const v=st[tr.dataset.k];return v&&v.guilde&&v.date?new Date(v.date).getTime():null};
+ const rows=[...tb.querySelectorAll('tr[data-k]')];
+ rows.sort((x,y)=>{
+  if(srt==='orig')return x.dataset.i-y.dataset.i;
+  const p=ts(x),q=ts(y);
+  if(p===null&&q===null)return x.dataset.i-y.dataset.i;
+  if(p===null)return 1;
+  if(q===null)return -1;
+  return srt==='old'?p-q:q-p;
+ });
+ rows.forEach(r=>tb.appendChild(r));
+}
 function build(){
- const f=$('#form');
+ const f=$('#form');drawTools();
  if(tab==='guildes'){
   $('#note').textContent='Nombre de percepteurs par guilde (calculé automatiquement). Supprimer une guilde libère ses percepteurs.';
   f.innerHTML='<div class="add"><input id="ng" class="in" placeholder="Nouvelle guilde…"><button id="nb" class="btn">Ajouter la guilde</button></div>';
@@ -151,12 +204,13 @@ function build(){
 function buildRows(){
  if(tab==='guildes')return;
  const T=TABS[tab],out=$('#out');
- out.innerHTML='<table><thead><tr><th>'+T.head[0]+'</th><th>'+T.head[1]+'</th><th>Guilde perco</th><th>Date</th><th>Commentaire</th></tr></thead><tbody>'+
- rowsOf(tab).map(r=>'<tr data-k="'+esc(r.k)+'" data-b="'+esc((r.a+' '+r.b).toLowerCase())+'"><td class="z">'+esc(r.a)+(r.d?'<button class="x" data-act="l" data-key="'+esc(r.d)+'" title="Supprimer ce lieu">✕</button>':'')+'</td><td class="c">'+esc(r.b)+'</td><td><input class="f g1" list="gl" placeholder="Guilde…"></td><td class="d"></td><td><input class="f c1" placeholder="Commentaire…"></td></tr>').join('')+'</tbody></table>';
+ out.innerHTML='<table><thead><tr><th>'+T.head[0]+'</th><th>'+T.head[1]+'</th><th>Guilde perco</th><th>Dernière vue</th><th>Commentaire</th></tr></thead><tbody>'+
+ rowsOf(tab).map((r,i)=>'<tr data-i="'+i+'" data-k="'+esc(r.k)+'" data-b="'+esc((r.a+' '+r.b).toLowerCase())+'"><td class="z">'+esc(r.a)+(r.d?'<button class="x" data-act="l" data-key="'+esc(r.d)+'" title="Supprimer ce lieu">✕</button>':'')+'</td><td class="c'+(r.b&&tab!=='donjons'?' cp':'')+'" data-cp="'+esc(coord(r.b))+'" title="'+(r.b&&tab!=='donjons'?'Cliquer pour copier':'')+'">'+esc(coord(r.b))+'</td><td><input class="f g1" list="gl" placeholder="Guilde…"></td><td class="d"><span class="rel"></span><button class="seen" title="Marquer comme vu maintenant" hidden>👁</button></td><td><input class="f c1" placeholder="Commentaire…"></td></tr>').join('')+'</tbody></table>';
  out.querySelectorAll('tr[data-k]').forEach(tr=>{
   const k=tr.dataset.k;
   tr.querySelector('.g1').onchange=e=>{const g=e.target.value.trim();save(k,{guilde:g,date:g?new Date().toISOString():''})};
   tr.querySelector('.c1').onchange=e=>save(k,{commentaire:e.target.value.trim()});
+  tr.querySelector('.seen').onclick=()=>{if((st[k]||{}).guilde)save(k,{date:new Date().toISOString()})};
  });
  paint();
 }
@@ -175,18 +229,30 @@ function paint(){
   const g=tr.querySelector('.g1'),c=tr.querySelector('.c1');
   if(document.activeElement!==g)g.value=v.guilde||'';
   if(document.activeElement!==c)c.value=v.commentaire||'';
-  tr.querySelector('.d').textContent=fmt(v.date);
+  const rel=tr.querySelector('.rel');rel.textContent=ago(v.date)+(v.date&&v.par?' par '+v.par:'');rel.title=fmt(v.date)+(v.par?' — '+v.par:'');rel.className='rel '+fresh(v.date);
+  tr.querySelector('.seen').hidden=!v.guilde;
   tr.classList.toggle('has',!!v.guilde);
   tr.dataset.s=tr.dataset.b+'|'+(v.guilde||'').toLowerCase();
+  tr.dataset.free=v.guilde?'':'1';
+  tr.dataset.stale=(v.guilde&&(!v.date||Date.now()-new Date(v.date)>259200000))?'1':'';
  });
+ sortRows();
  filter();
 }
 function filter(){
  const q=$('#q').value.trim().toLowerCase();
- document.querySelectorAll('#out tr[data-k]').forEach(tr=>{tr.style.display=!q||(tr.dataset.s||'').includes(q)?'':'none'});
+ document.querySelectorAll('#out tr[data-k]').forEach(tr=>{
+  const okq=!q||(tr.dataset.s||'').includes(q);
+  const okf=flt==='all'||(flt==='free'&&tr.dataset.free)||(flt==='stale'&&tr.dataset.stale);
+  tr.style.display=okq&&okf?'':'none';
+ });
 }
 $('#q').oninput=filter;
+$('#me').value=pseudo;
+$('#me').onchange=e=>{pseudo=e.target.value.trim();try{localStorage.setItem('pseudo',pseudo)}catch(x){}};
+$('#out').addEventListener('focusout',()=>setTimeout(()=>{if(srt!=='orig')paint()},250));
 $('#out').onclick=e=>{
+ const cp=e.target.closest('td.cp');if(cp){copyTxt(cp.dataset.cp);return}
  const b=e.target.closest('button[data-act]');if(!b)return;
  const act=b.dataset.act,key=b.dataset.key,tag=act+key;
  if(pend!==tag){
@@ -198,40 +264,22 @@ $('#out').onclick=e=>{
  if(act==='g')removeGuild(key);else removeLieu(key);
 };
 drawTabs();build();
-let db=null,code='';
-try{code=localStorage.getItem('pc')||''}catch(e){}
-const msg=m=>{$('#lockmsg').textContent=m};
+let db=null;
 const mk=(c,name)=>({
  doc:k=>({set:v=>setDoc(doc(db,'g',c,name,k),v),delete:()=>deleteDoc(doc(db,'g',c,name,k))}),
  onSnapshot:(n,e)=>onSnapshot(collection(db,'g',c,name),n,e)
 });
-async function connect(create){
- const c=$('#lockin').value.trim()||code;
- if(firebaseConfig.apiKey.includes('COLLE')){$('#lock').hidden=false;msg("Configuration Firebase manquante : remplis firebaseConfig dans index.html.");return}
- if(!c){$('#lock').hidden=false;return}
- if(!/^[A-Za-z0-9_-]{4,}$/.test(c)){$('#lock').hidden=false;msg('Code : 4 caractères minimum (lettres, chiffres, - et _ uniquement).');return}
- try{
-  if(!db)db=getFirestore(initializeApp(firebaseConfig));
-  const ok=doc(db,'g',c,'meta','ok');
-  const s=await getDoc(ok);
-  if(!s.exists()){
-   if(!create){$('#lock').hidden=false;$('#lockcreate').hidden=false;msg("Code inconnu. Si c'est le tout premier lancement, clique sur « Créer l'espace ».");return}
-   await setDoc(ok,{at:new Date().toISOString()});
-  }
- }catch(e){$('#lock').hidden=false;msg('Connexion impossible : '+(e.code||e.message));return}
- code=c;try{localStorage.setItem('pc',c)}catch(e){}
- $('#lock').hidden=true;msg('');
- coll=mk(c,'entries');cuColl=mk(c,'lieux');gColl=mk(c,'guilds');
- const err=e=>{$('#sync').textContent='⚠️ '+(e.code||'erreur')};
+function connect(){
+ if(firebaseConfig.apiKey.includes('COLLE')){$('#sync').textContent='⚠️ Configuration Firebase manquante : remplis firebaseConfig dans index.html.';return}
+ try{db=getFirestore(initializeApp(firebaseConfig))}catch(e){$('#sync').textContent='⚠️ Configuration Firebase invalide';return}
+ coll=mk(SPACE,'entries');cuColl=mk(SPACE,'lieux');gColl=mk(SPACE,'guilds');
+ const err=e=>{$('#sync').textContent='⚠️ '+(e.code==='permission-denied'?'Accès refusé : publie les règles Firestore':(e.code||'erreur'))};
  coll.onSnapshot(s=>{const n={};s.docs.forEach(d=>{n[d.id]=d.data()});st=n;paint();$('#sync').textContent='🟢 Synchronisé en direct'},err);
  cuColl.onSnapshot(s=>{const n={};s.docs.forEach(d=>{n[d.id]=d.data()});cu=n;if(tab==='autres'||tab==='zones')buildRows()},err);
  gColl.onSnapshot(s=>{const n={};s.docs.forEach(d=>{n[d.id]=d.data()});gd=n;paint()},err);
 }
-$('#lockbtn').onclick=()=>connect(false);
-$('#lockcreate').onclick=()=>connect(true);
-$('#lockin').onkeydown=e=>{if(e.key==='Enter')connect(false)};
-$('#logout').onclick=e=>{e.preventDefault();try{localStorage.removeItem('pc')}catch(x){}location.reload()};
-connect(false);
+connect();
+setInterval(()=>{if(tab!=='guildes')paint()},60000);
 </script>
 </body>
 </html>
